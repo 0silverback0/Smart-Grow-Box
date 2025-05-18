@@ -7,13 +7,34 @@ from soil import check_soil_moisture
 import network
 from makePage import make_page
 
+# --- Load Wi-Fi Credentials from .env File ---
+def load_env(file_path="security.env"):
+    """Load environment variables from a .env file."""
+    env_vars = {}
+    try:
+        with open(file_path, "r") as f:
+            for line in f:
+                if line.strip() and not line.startswith("#"):
+                    key, value = line.strip().split("=", 1)
+                    env_vars[key] = value
+    except Exception as e:
+        print(f"Error loading .env file: {e}")
+    return env_vars
+
+# Load Wi-Fi credentials
+env = load_env()
+wifi_ssid = env.get("WIFI_SSID")
+wifi_password = env.get("WIFI_PASSWORD")
+
+if not wifi_ssid or not wifi_password:
+    raise RuntimeError("Wi-Fi SSID or password not found in security.env file.")
 
 # --- Wi-Fi Setup ---
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
-wlan.connect("Eva", "slowmint729")
+wlan.connect(wifi_ssid, wifi_password)
 
-print("📡 Connecting to Wi-Fi...")
+print("Connecting to Wi-Fi...")
 timeout = 10
 start_time = time()
 while not wlan.isconnected() and (time() - start_time) < timeout:
@@ -21,7 +42,7 @@ while not wlan.isconnected() and (time() - start_time) < timeout:
     sleep(1)
 
 if wlan.isconnected():
-    print("✅ Connected to Wi-Fi:", wlan.ifconfig())
+    print("Connected to Wi-Fi:", wlan.ifconfig())
     sync_ntp_time(timezone_offset=-14400)  # EDT
 else:
     raise RuntimeError("Failed to connect to Wi-Fi. Cannot continue.")
@@ -79,7 +100,6 @@ def log_event(event, temp, humidity, soil):
     if len(logs) > 50:
         logs.pop()
 
-
 # --- Web Server Setup ---
 ip = wlan.ifconfig()[0]
 print("Web server available at: http://" + ip)
@@ -117,7 +137,7 @@ while True:
             sleep(FAN_RUN_TIME)
             fan.off()
             print("Fan OFF")
-            log_event("Fan ran (perodic)", temp, humidity, soil)
+            log_event("Fan ran (periodic)", temp, humidity, soil)
             last_fan_run = time()
 
         # Run fan if humidity exceeds 60%
@@ -128,7 +148,6 @@ while True:
             fan.off()
             print("Fan OFF (humidity)")
             log_event("Fan ran (humidity)", temp, humidity, soil)
-
 
         # Handle web requests
         try:
